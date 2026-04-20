@@ -1,0 +1,92 @@
+{
+  "bridge_version": "0.2",
+  "bridge_record_id": "brg_pending_0001",
+  "created_at": "2026-04-20T01:00:00Z",
+  "updated_at": "2026-04-20T01:02:00Z",
+  "status": "pending",
+  "reason_codes": [
+    "awaiting_trace_sync",
+    "verification_not_checked"
+  ],
+  "sync_ids": {
+    "correlation_id": "corr_pending_0001",
+    "rsl_report_id": "rslrep_pending_0001",
+    "trace_event_id": null,
+    "inference_event_id": "inf_pending_0001",
+    "external_charge_event_id": "chg_pending_0001",
+    "royalty_settlement_id": null
+  },
+  "idempotency": {
+    "idempotency_key": "idem_chg_pending_0001",
+    "dedupe_scope": "external_charge_event",
+    "dedupe_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "replay_sequence": 1,
+    "prior_event_ref": null
+  },
+  "compatibility": {
+    "spec_family": "rsl-kazene-bridge",
+    "compatibility_level": "strict",
+    "extension_namespace": [
+      "kazene.dev/extensions"
+    ]
+  },
+  "access_snapshot": {
+    "access_time": "2026-04-20T01:00:00Z",
+    "requester_type": "ai_agent",
+    "requester_id": "agent_pending_0001",
+    "asset_ref": "work_pending_0001",
+    "usage_context": "licensed_inference",
+    "source_system": "license-gateway-01",
+    "license_context": "rsl-standard-commercial",
+    "usage_units": 1,
+    "usage_unit_type": "request"
+  },
+  "external_charge_event": {
+    "charge_time": "2026-04-20T01:00:03Z",
+    "currency": "USD",
+    "gross_amount": 0.95,
+    "net_amount": 0.85,
+    "tax_amount": 0.10,
+    "billing_basis": "per_inference",
+    "charge_status": "captured",
+    "payer_ref": "acct_pending_0001",
+    "invoice_ref": "inv_pending_20260420_0001"
+  },
+  "royalty_settlement": {
+    "settlement_status": "not_ready",
+    "settlement_amount": null,
+    "settlement_currency": null,
+    "settlement_memo": "Pending because Kazene trace_event_id has not arrived yet."
+  },
+  "verification": {
+    "signature_bundle": {
+      "algorithm": "ed25519",
+      "signed_fields": [
+        "access_snapshot",
+        "external_charge_event",
+        "royalty_settlement"
+      ],
+      "signer": {
+        "signer_type": "license_server",
+        "signer_id": "did:example:license-server-pending-01",
+        "key_id": "key-1"
+      },
+      "signature": "base64:PENDINGEXAMPLESIGNATURE0001",
+      "signed_at": "2026-04-20T01:00:05Z"
+    },
+    "verification_result": {
+      "status": "not_checked",
+      "checked_at": null,
+      "verifier_id": null,
+      "failure_reason": null
+    }
+  },
+  "extensions": [
+    {
+      "extension_namespace": "kazene.dev/extensions",
+      "extension_key": "pipeline_stage",
+      "value": "awaiting_trace_ingest",
+      "compatibility_level": "informational"
+    }
+  ]
+}
