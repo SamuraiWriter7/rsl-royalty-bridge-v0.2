@@ -1,0 +1,53 @@
+digraph RSLKazeneFullIntegration {
+  rankdir=TB;
+  graph [fontsize=12, labelloc="t", label="RSL Collective × RSL-to-Kazene Bridge × Kazene Royalty OS"];
+  node [shape=box, style="rounded"];
+
+  subgraph cluster_1 {
+    label="Layer 1: Discovery / Authorization";
+    style="rounded";
+    rsl_standard [label="RSL Standard\nMachine-readable licensing\nDiscovery / authorization"];
+    publisher_terms [label="Publisher / Platform Terms\nPermission scope\nUsage rules"];
+  }
+
+  subgraph cluster_2 {
+    label="Layer 2: Collective Licensing / Reporting";
+    style="rounded";
+    rsl_collective [label="RSL Collective\nCollective licensing\nRepertoire / period reports"];
+    ai_company [label="AI Company\nLicense acquisition\nUsage reporting"];
+  }
+
+  subgraph cluster_3 {
+    label="Layer 3: Bridge / Reconciliation";
+    style="rounded";
+    bridge [label="RSL-to-Kazene Bridge v0.2\nsync_ids / verification / idempotency\nstate machine"];
+    report_id [label="rsl_report_id"];
+    trace_id [label="trace_event_id"];
+    ext_charge [label="external_charge_event_id"];
+    corr_id [label="correlation_id"];
+  }
+
+  subgraph cluster_4 {
+    label="Layer 4: Trace Allocation / Royalty Return";
+    style="rounded";
+    kazene [label="Kazene Royalty OS\nTrace weighting\nRoyalty pool allocation"];
+    creator_return [label="Creator / Work Return\nInternal allocation\nRecompute / reverse"];
+  }
+
+  publisher_terms -> rsl_standard [label="publish terms"];
+  rsl_standard -> rsl_collective [label="discoverable licensing"];
+  ai_company -> rsl_collective [label="license + report"];
+  rsl_collective -> bridge [label="period report / repertoire scope"];
+
+  ai_company -> bridge [label="runtime access metadata"];
+  report_id -> bridge [label="external report anchor"];
+  trace_id -> bridge [label="internal trace anchor"];
+  ext_charge -> bridge [label="billing anchor"];
+  corr_id -> bridge [label="bundle lineage"];
+
+  bridge -> kazene [label="settlement-ready reconciled events"];
+  kazene -> creator_return [label="trace-based distribution"];
+
+  rsl_collective -> ai_company [label="permission"];
+  bridge -> ai_company [label="audit / reconciliation feedback"];
+}
