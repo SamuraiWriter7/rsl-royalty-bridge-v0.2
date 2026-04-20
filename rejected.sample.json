@@ -1,0 +1,82 @@
+{
+  "bridge_version": "0.2",
+  "bridge_record_id": "brg_rejected_0001",
+  "created_at": "2026-04-20T03:00:00Z",
+  "updated_at": "2026-04-20T03:04:00Z",
+  "status": "rejected",
+  "reason_codes": [
+    "missing_sync_ids",
+    "verification_failed",
+    "not_eligible_for_settlement"
+  ],
+  "sync_ids": {
+    "correlation_id": "corr_rejected_0001",
+    "rsl_report_id": null,
+    "trace_event_id": null,
+    "inference_event_id": "inf_rejected_0001",
+    "external_charge_event_id": "chg_rejected_0001",
+    "royalty_settlement_id": null
+  },
+  "idempotency": {
+    "idempotency_key": "idem_chg_rejected_0001",
+    "dedupe_scope": "external_charge_event",
+    "dedupe_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "replay_sequence": 1,
+    "prior_event_ref": null
+  },
+  "compatibility": {
+    "spec_family": "rsl-kazene-bridge",
+    "compatibility_level": "strict",
+    "extension_namespace": []
+  },
+  "access_snapshot": {
+    "access_time": "2026-04-20T03:00:00Z",
+    "requester_type": "unknown",
+    "requester_id": "unknown_actor",
+    "asset_ref": "work_rejected_0001",
+    "usage_context": "other",
+    "source_system": "license-gateway-03",
+    "license_context": "unknown"
+  },
+  "external_charge_event": {
+    "charge_time": "2026-04-20T03:00:01Z",
+    "currency": "USD",
+    "gross_amount": 0.50,
+    "net_amount": 0.45,
+    "tax_amount": 0.05,
+    "billing_basis": "other",
+    "charge_status": "observed",
+    "payer_ref": "acct_rejected_0001",
+    "invoice_ref": "inv_rejected_20260420_0001"
+  },
+  "royalty_settlement": {
+    "settlement_status": "rejected",
+    "settlement_amount": null,
+    "settlement_currency": null,
+    "settlement_memo": "Rejected because both rsl_report_id and trace_event_id are missing."
+  },
+  "verification": {
+    "signature_bundle": {
+      "algorithm": "ed25519",
+      "signed_fields": [
+        "access_snapshot",
+        "external_charge_event",
+        "royalty_settlement"
+      ],
+      "signer": {
+        "signer_type": "other",
+        "signer_id": "did:example:unknown-signer-01",
+        "key_id": "key-x"
+      },
+      "signature": "base64:REJECTEDEXAMPLESIGNATURE0001",
+      "signed_at": "2026-04-20T03:00:02Z"
+    },
+    "verification_result": {
+      "status": "failed",
+      "checked_at": "2026-04-20T03:03:30Z",
+      "verifier_id": "auditor_rejected_0001",
+      "failure_reason": "missing_required_sync_pair"
+    }
+  },
+  "extensions": []
+}
