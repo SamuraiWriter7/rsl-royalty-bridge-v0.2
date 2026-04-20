@@ -1,0 +1,824 @@
+spec:
+  name: "RSL-to-Kazene Royalty Bridge Specification"
+  short_name: "rsl-royalty-bridge"
+  version: "0.2"
+  status: "draft"
+  maturity: "implementation-ready"
+  language: "en"
+  canonical_id: "rsl-royalty-bridge-v0.2"
+  summary: >
+    A bridge specification connecting RSL-side external access and charging records
+    with Kazene Royalty OS-side trace and royalty settlement records, designed for
+    auditability, synchronization integrity, idempotent processing, and extensible
+    interoperability.
+  goals:
+    - "Define a durable bridge between external licensing logs and internal royalty traces."
+    - "Prevent one-sided truth models by requiring bidirectional synchronization."
+    - "Upgrade records into verifiable audit evidence through signatures and verification."
+    - "Prevent duplicate counting and support deterministic recalculation."
+    - "Allow extensions without breaking the core contract."
+  non_goals:
+    - "Define a global PKI or certificate authority."
+    - "Mandate one payment rail or blockchain."
+    - "Replace RSL or Kazene Royalty OS independently."
+    - "Force all extensions into the core vocabulary."
+  design_principles:
+    - id: "P1"
+      name: "Bidirectional Integrity"
+      statement: >
+        Settlement eligibility requires alignment between external RSL records and
+        internal Kazene trace records.
+    - id: "P2"
+      name: "Evidence over Assumption"
+      statement: >
+        Core bridge objects should be signable and verifiable as audit evidence.
+    - id: "P3"
+      name: "Idempotent by Default"
+      statement: >
+        Replays and retries must not create duplicate financial or royalty outcomes.
+    - id: "P4"
+      name: "Failure is a First-Class State"
+      statement: >
+        Partial synchronization, verification failures, and blocked dependencies
+        are formal states, not informal exceptions.
+    - id: "P5"
+      name: "Narrow Core, Open Edge"
+      statement: >
+        The core vocabulary remains stable while extensions are namespaced and
+        compatibility-scoped.
+
+document_conventions:
+  timestamps:
+    format: "RFC3339"
+    timezone: "UTC recommended"
+  ids:
+    requirement: "Globally unique within implementation scope"
+    recommended_format: "prefix + opaque identifier"
+  hashing:
+    default_algorithm: "sha256"
+    hash_format: "algorithm:value"
+  signatures:
+    preferred_algorithms:
+      - "ed25519"
+      - "ecdsa-p256"
+      - "rsa-pss-sha256"
+  nullability_rule: >
+    Fields explicitly marked nullable may be null before readiness or during
+    partial synchronization. Required fields must exist even if their value is null
+    when allowed by the field definition.
+
+bridge_model:
+  primary_record: "bridge_record"
+  bridge_record_definition:
+    description: >
+      A bridge_record is the canonical synchronization container that connects
+      one RSL-side reporting context and one Kazene-side trace context into a
+      settlement-capable unit.
+    cardinality:
+      rsl_report_id_to_bridge_record: "one-to-many allowed"
+      trace_event_id_to_bridge_record: "one-to-many allowed"
+      correlation_id_to_bridge_record: "one-to-many allowed"
+    invariants:
+      - "A bridge_record must declare bridge_version."
+      - "A bridge_record must declare status."
+      - "A bridge_record must contain sync_ids."
+      - "A bridge_record must contain idempotency."
+      - "A bridge_record must contain compatibility."
+      - "A bridge_record must contain access_snapshot."
+      - "A bridge_record must contain external_charge_event."
+      - "A bridge_record must contain royalty_settlement."
+      - "A bridge_record must contain verification."
+
+core_objects:
+  bridge_record:
+    required_fields:
+      - "bridge_version"
+      - "bridge_record_id"
+      - "created_at"
+      - "updated_at"
+      - "status"
+      - "sync_ids"
+      - "idempotency"
+      - "compatibility"
+      - "access_snapshot"
+      - "external_charge_event"
+      - "royalty_settlement"
+      - "verification"
+    fields:
+      bridge_version:
+        type: "string"
+        const: "0.2"
+      bridge_record_id:
+        type: "string"
+        example: "brg_01HXYZ..."
+      created_at:
+        type: "string"
+        format: "date-time"
+      updated_at:
+        type: "string"
+        format: "date-time"
+      status:
+        type: "string"
+        enum:
+          - "pending"
+          - "blocked_or_pending"
+          - "ready"
+          - "rejected"
+          - "settled"
+          - "reversed"
+      reason_codes:
+        type: "array"
+        items_type: "string"
+        description: >
+          Implementation-defined reason codes explaining the current state.
+      sync_ids:
+        ref: "sync_ids"
+      idempotency:
+        ref: "idempotency"
+      compatibility:
+        ref: "compatibility"
+      access_snapshot:
+        ref: "access_snapshot"
+      external_charge_event:
+        ref: "external_charge_event"
+      royalty_settlement:
+        ref: "royalty_settlement"
+      verification:
+        ref: "verification"
+      extensions:
+        type: "array"
+        required: false
+        items_ref: "extension_entry"
+
+  sync_ids:
+    description: >
+      Identifiers used to align RSL-side and Kazene-side records, plus bridge-local
+      correlation and settlement tracking.
+    required_fields:
+      - "correlation_id"
+      - "rsl_report_id"
+      - "trace_event_id"
+      - "inference_event_id"
+      - "external_charge_event_id"
+      - "royalty_settlement_id"
+    fields:
+      correlation_id:
+        type: "string"
+        description: >
+          Bundle identifier for tracking logically related events across systems.
+      rsl_report_id:
+        type: "string"
+        nullable: true
+        description: "Identifier of the upstream RSL-side report or report unit."
+      trace_event_id:
+        type: "string"
+        nullable: true
+        description: "Identifier of the Kazene-side trace event."
+      inference_event_id:
+        type: "string"
+        nullable: true
+        description: "Identifier of the inference or access execution unit."
+      external_charge_event_id:
+        type: "string"
+        nullable: true
+        description: "Identifier of the external charge event."
+      royalty_settlement_id:
+        type: "string"
+        nullable: true
+        description: "Identifier of the royalty settlement event."
+
+  idempotency:
+    description: >
+      Controls replay safety and deterministic duplicate suppression.
+    required_fields:
+      - "idempotency_key"
+      - "dedupe_scope"
+      - "dedupe_hash"
+      - "replay_sequence"
+    fields:
+      idempotency_key:
+        type: "string"
+        description: >
+          Stable key reused across safe retries of the same logical event.
+      dedupe_scope:
+        type: "string"
+        enum:
+          - "inference_event"
+          - "external_charge_event"
+          - "royalty_settlement"
+      dedupe_hash:
+        type: "string"
+        description: >
+          Canonical hash of normalized business-significant fields.
+      replay_sequence:
+        type: "integer"
+        minimum: 1
+        description: >
+          Monotonically increasing replay count for the same idempotency key.
+      prior_event_ref:
+        type: "string"
+        nullable: true
+        required: false
+      recomputation:
+        ref: "recomputation"
+        required: false
+
+  recomputation:
+    required_fields:
+      - "is_recalculation"
+      - "prior_settlement_id"
+      - "recompute_reason"
+      - "recompute_version"
+    fields:
+      is_recalculation:
+        type: "boolean"
+      prior_settlement_id:
+        type: "string"
+        nullable: true
+      recompute_reason:
+        type: "string"
+        nullable: true
+      recompute_version:
+        type: "integer"
+        minimum: 1
+
+  compatibility:
+    description: >
+      Declares how strictly a record adheres to the core bridge contract and
+      what extension namespaces are in scope.
+    required_fields:
+      - "spec_family"
+      - "compatibility_level"
+      - "extension_namespace"
+    fields:
+      spec_family:
+        type: "string"
+        const: "rsl-kazene-bridge"
+      compatibility_level:
+        type: "string"
+        enum:
+          - "strict"
+          - "compatible"
+          - "informational"
+          - "experimental"
+      extension_namespace:
+        type: "array"
+        items_type: "string"
+        description: >
+          List of declared extension namespaces used anywhere in this record.
+
+  access_snapshot:
+    description: >
+      External-facing observation of access or inference usage under a licensing
+      or reporting context.
+    required_fields:
+      - "access_time"
+      - "requester_type"
+      - "requester_id"
+      - "asset_ref"
+      - "usage_context"
+    fields:
+      access_time:
+        type: "string"
+        format: "date-time"
+      requester_type:
+        type: "string"
+        enum:
+          - "human_user"
+          - "ai_agent"
+          - "service_account"
+          - "batch_job"
+          - "unknown"
+      requester_id:
+        type: "string"
+      asset_ref:
+        type: "string"
+      usage_context:
+        type: "string"
+        enum:
+          - "licensed_inference"
+          - "retrieval"
+          - "summarization"
+          - "embedding"
+          - "evaluation"
+          - "other"
+      source_system:
+        type: "string"
+        required: false
+      license_context:
+        type: "string"
+        required: false
+      usage_units:
+        type: "number"
+        required: false
+      usage_unit_type:
+        type: "string"
+        required: false
+
+  external_charge_event:
+    description: >
+      Financial or quasi-financial charge information generated on the external
+      access side.
+    required_fields:
+      - "charge_time"
+      - "currency"
+      - "gross_amount"
+      - "billing_basis"
+    fields:
+      charge_time:
+        type: "string"
+        format: "date-time"
+      currency:
+        type: "string"
+        description: "ISO 4217 currency code recommended."
+      gross_amount:
+        type: "number"
+        minimum: 0
+      net_amount:
+        type: "number"
+        minimum: 0
+        required: false
+      tax_amount:
+        type: "number"
+        minimum: 0
+        required: false
+      billing_basis:
+        type: "string"
+        enum:
+          - "per_inference"
+          - "per_token"
+          - "per_request"
+          - "per_batch"
+          - "subscription_allocation"
+          - "hybrid"
+          - "other"
+      charge_status:
+        type: "string"
+        enum:
+          - "observed"
+          - "authorized"
+          - "captured"
+          - "failed"
+          - "reversed"
+        required: false
+      payer_ref:
+        type: "string"
+        required: false
+      invoice_ref:
+        type: "string"
+        required: false
+
+  royalty_settlement:
+    description: >
+      Internal royalty resolution state derived from synchronized bridge evidence.
+    required_fields:
+      - "settlement_status"
+      - "settlement_amount"
+      - "settlement_currency"
+    fields:
+      settlement_status:
+        type: "string"
+        enum:
+          - "not_ready"
+          - "eligible"
+          - "calculated"
+          - "settled"
+          - "rejected"
+          - "reversed"
+      settlement_amount:
+        type: "number"
+        minimum: 0
+        nullable: true
+      settlement_currency:
+        type: "string"
+        nullable: true
+      settlement_time:
+        type: "string"
+        format: "date-time"
+        required: false
+      allocation_basis:
+        type: "string"
+        required: false
+      beneficiary_ref:
+        type: "string"
+        required: false
+      settlement_memo:
+        type: "string"
+        required: false
+
+  verification:
+    description: >
+      Signature declaration and verification result for audit evidence.
+    required_fields:
+      - "signature_bundle"
+      - "verification_result"
+    fields:
+      signature_bundle:
+        ref: "signature_bundle"
+      verification_result:
+        ref: "verification_result"
+
+  signature_bundle:
+    required_fields:
+      - "algorithm"
+      - "signed_fields"
+      - "signer"
+      - "signature"
+      - "signed_at"
+    fields:
+      algorithm:
+        type: "string"
+      signed_fields:
+        type: "array"
+        items_type: "string"
+        minimum_items: 1
+      signer:
+        ref: "signer"
+      signature:
+        type: "string"
+      signed_at:
+        type: "string"
+        format: "date-time"
+
+  signer:
+    required_fields:
+      - "signer_type"
+      - "signer_id"
+      - "key_id"
+    fields:
+      signer_type:
+        type: "string"
+        enum:
+          - "platform"
+          - "publisher"
+          - "license_server"
+          - "ai_provider"
+          - "auditor"
+          - "other"
+      signer_id:
+        type: "string"
+      key_id:
+        type: "string"
+
+  verification_result:
+    required_fields:
+      - "status"
+      - "checked_at"
+      - "verifier_id"
+      - "failure_reason"
+    fields:
+      status:
+        type: "string"
+        enum:
+          - "verified"
+          - "failed"
+          - "not_checked"
+      checked_at:
+        type: "string"
+        format: "date-time"
+        nullable: true
+      verifier_id:
+        type: "string"
+        nullable: true
+      failure_reason:
+        type: "string"
+        nullable: true
+
+  extension_entry:
+    description: >
+      A namespaced extension value with declared compatibility.
+    required_fields:
+      - "extension_namespace"
+      - "extension_key"
+      - "value"
+      - "compatibility_level"
+    fields:
+      extension_namespace:
+        type: "string"
+      extension_key:
+        type: "string"
+      value:
+        type: "any"
+      compatibility_level:
+        type: "string"
+        enum:
+          - "strict"
+          - "compatible"
+          - "informational"
+          - "experimental"
+
+synchronization_rules:
+  settlement_gate:
+    description: >
+      A bridge_record is eligible to move toward settlement only when both
+      RSL-side and Kazene-side synchronization conditions are satisfied.
+    required_for_ready:
+      - "sync_ids.rsl_report_id is not null"
+      - "sync_ids.trace_event_id is not null"
+      - "verification.signature_bundle exists"
+      - "idempotency.idempotency_key exists"
+      - "idempotency.dedupe_hash exists"
+      - "no duplicate conflict detected"
+      - "no terminal verification failure"
+  orphan_handling:
+    rsl_only_record:
+      condition: "rsl_report_id exists and trace_event_id is null"
+      required_status: "blocked_or_pending"
+      recommended_reason_codes:
+        - "missing_trace_event"
+    trace_only_record:
+      condition: "trace_event_id exists and rsl_report_id is null"
+      required_status: "blocked_or_pending"
+      recommended_reason_codes:
+        - "missing_rsl_report"
+    fully_missing:
+      condition: "rsl_report_id is null and trace_event_id is null"
+      required_status: "rejected"
+      recommended_reason_codes:
+        - "missing_sync_ids"
+  correlation_policy:
+    statement: >
+      correlation_id should remain stable across retries, enrichments, and
+      recomputation flows that belong to the same logical business event group.
+
+signature_and_verification_policy:
+  required_signature_targets:
+    - "access_snapshot"
+    - "external_charge_event"
+    - "royalty_settlement"
+  minimum_requirement:
+    statement: >
+      v0.2 requires that signable fields and verification results be structurally
+      present. Implementations may defer mandatory cryptographic verification at
+      rollout, but not the fields that carry verification state.
+  verification_effects:
+    verified:
+      meaning: "The signed payload is cryptographically accepted by the verifier."
+      allowed_next_states:
+        - "ready"
+        - "settled"
+    failed:
+      meaning: "The signature or payload integrity check failed."
+      required_next_states:
+        - "blocked_or_pending"
+        - "rejected"
+    not_checked:
+      meaning: "Verification has not yet been executed."
+      allowed_next_states:
+        - "pending"
+        - "blocked_or_pending"
+
+idempotency_policy:
+  mandatory_scopes:
+    - "external_charge_event"
+    - "royalty_settlement"
+  recommended_scope:
+    - "inference_event"
+  duplicate_decision_rules:
+    - id: "D1"
+      statement: >
+        Same idempotency_key and same dedupe_scope with same dedupe_hash
+        must be treated as a replay, not a new event.
+    - id: "D2"
+      statement: >
+        Same idempotency_key and same dedupe_scope with different dedupe_hash
+        must not be auto-settled and should transition to blocked_or_pending
+        for audit review.
+    - id: "D3"
+      statement: >
+        A recomputation must declare recomputation metadata and must not silently
+        overwrite a previous settlement lineage.
+  dedupe_hash_recommended_inputs:
+    - "requester_id"
+    - "asset_ref"
+    - "billing_basis"
+    - "gross_amount"
+    - "currency"
+    - "access_time bucket"
+    - "license_context if present"
+
+state_machine:
+  states:
+    pending:
+      description: >
+        The record exists, but required synchronization or verification evidence
+        is not yet sufficient for settlement readiness.
+    blocked_or_pending:
+      description: >
+        The record is materially incomplete or under suspicion due to missing
+        dependencies, unresolved duplication, or failed verification.
+    ready:
+      description: >
+        Synchronization, verification state, and dedupe checks are sufficient
+        for settlement computation.
+    rejected:
+      description: >
+        The record is definitively excluded from settlement due to validation,
+        policy, compatibility, or integrity failure.
+    settled:
+      description: >
+        Royalty outcome has been finalized and recorded.
+    reversed:
+      description: >
+        A previously settled outcome has been reversed due to correction, dispute,
+        or audit action.
+  transitions:
+    - from: "pending"
+      to: "ready"
+      when_all:
+        - "rsl_report_id present"
+        - "trace_event_id present"
+        - "duplicate conflict absent"
+        - "verification status is verified or implementation allows not_checked before final computation"
+    - from: "pending"
+      to: "blocked_or_pending"
+      when_any:
+        - "one sync side remains missing beyond policy window"
+        - "signature verification pending with dependency issue"
+        - "potential duplicate conflict detected"
+    - from: "blocked_or_pending"
+      to: "ready"
+      when_all:
+        - "missing dependency resolved"
+        - "verification issue resolved or accepted by implementation policy"
+        - "dedupe conflict cleared"
+    - from: "blocked_or_pending"
+      to: "rejected"
+      when_any:
+        - "terminal verification failure"
+        - "unsupported strictness mismatch"
+        - "out-of-policy record confirmed"
+    - from: "ready"
+      to: "settled"
+      when_all:
+        - "royalty computation completed"
+        - "settlement recorded"
+    - from: "ready"
+      to: "rejected"
+      when_any:
+        - "post-readiness audit invalidates eligibility"
+    - from: "settled"
+      to: "reversed"
+      when_any:
+        - "correction required"
+        - "audit reversal required"
+        - "charge reversal propagated"
+
+compatibility_policy:
+  levels:
+    strict:
+      meaning: >
+        Fully conforms to the v0.2 core contract and may participate in automated
+        settlement workflows.
+    compatible:
+      meaning: >
+        Core structure is preserved, with additional tolerated deviations or
+        extensions that do not break the settlement contract.
+    informational:
+      meaning: >
+        Extension data may be retained for audit or analytics, but should not drive
+        automated settlement decisions.
+    experimental:
+      meaning: >
+        Unstable or trial vocabulary. Must be isolated from mandatory settlement logic.
+  rules:
+    - "Only strict and compatible data may influence automated readiness or settlement."
+    - "Informational and experimental data may be stored, displayed, and audited."
+    - "All extension keys must declare extension_namespace."
+    - "Namespace collisions must be treated as compatibility review issues."
+
+validation_rules:
+  required_ready_conditions:
+    - "status == ready implies sync_ids.rsl_report_id != null"
+    - "status == ready implies sync_ids.trace_event_id != null"
+    - "status == ready implies idempotency.idempotency_key is non-empty"
+    - "status == ready implies idempotency.dedupe_hash is non-empty"
+  required_settled_conditions:
+    - "status == settled implies royalty_settlement.settlement_status == settled"
+    - "status == settled implies royalty_settlement.settlement_amount != null"
+    - "status == settled implies royalty_settlement.settlement_currency != null"
+    - "status == settled implies sync_ids.royalty_settlement_id != null"
+  rejection_conditions_examples:
+    - "missing both rsl_report_id and trace_event_id"
+    - "terminal verification failure"
+    - "unsupported namespace used as settlement-critical input"
+    - "irreconcilable duplicate conflict"
+  reversal_requirements:
+    - "status == reversed implies prior settled lineage must be traceable"
+    - "status == reversed implies a reversal reason should be recorded"
+
+migration_from_v0_1:
+  intent: >
+    v0.1 established conceptual linkage. v0.2 strengthens implementation safety,
+    auditability, and failure-state determinism.
+  added_capabilities:
+    - "Formal sync_ids contract"
+    - "Formal signature and verification structure"
+    - "Formal idempotency and recomputation structure"
+    - "Formal compatibility and namespace management"
+    - "Formal state machine and transition semantics"
+  default_reading_of_v0_1_records:
+    bridge_version: "0.1"
+    interpreted_compatibility_level: "compatible"
+    interpreted_verification_status: "not_checked"
+    interpreted_status: "pending"
+  migration_rules:
+    - "v0.1 records should not be auto-settled without v0.2-equivalent sync and idempotency augmentation."
+    - "A migration layer may backfill compatibility and verification placeholders."
+    - "Missing idempotency metadata should trigger manual or policy-based enrichment."
+
+implementation_guidance:
+  rollout_phases:
+    - phase: "Phase 1"
+      name: "Structural Adoption"
+      focus:
+        - "Emit v0.2 fields"
+        - "Track sync_ids"
+        - "Track idempotency metadata"
+        - "Emit verification placeholders"
+    - phase: "Phase 2"
+      name: "Verification Activation"
+      focus:
+        - "Enable real signatures"
+        - "Enable verification pipeline"
+        - "Enforce blocked_or_pending on integrity issues"
+    - phase: "Phase 3"
+      name: "Automated Settlement"
+      focus:
+        - "Automate ready determination"
+        - "Automate dedupe suppression"
+        - "Automate settlement and reversal workflows"
+  operational_notes:
+    - "Do not silently overwrite settled lineage."
+    - "Keep correlation_id stable across retries and recomputations."
+    - "Treat blocked_or_pending as operationally meaningful, not as a vague waiting room."
+    - "Extensions are welcome; extension chaos is not."
+
+example_minimal_record:
+  bridge_version: "0.2"
+  bridge_record_id: "brg_0001"
+  created_at: "2026-04-20T00:00:00Z"
+  updated_at: "2026-04-20T00:00:00Z"
+  status: "pending"
+  reason_codes:
+    - "awaiting_trace_sync"
+  sync_ids:
+    correlation_id: "corr_0001"
+    rsl_report_id: "rslrep_0001"
+    trace_event_id: null
+    inference_event_id: "inf_0001"
+    external_charge_event_id: "chg_0001"
+    royalty_settlement_id: null
+  idempotency:
+    idempotency_key: "idem_chg_0001"
+    dedupe_scope: "external_charge_event"
+    dedupe_hash: "sha256:abc123"
+    replay_sequence: 1
+  compatibility:
+    spec_family: "rsl-kazene-bridge"
+    compatibility_level: "strict"
+    extension_namespace:
+      - "kazene.dev/extensions"
+  access_snapshot:
+    access_time: "2026-04-20T00:00:00Z"
+    requester_type: "ai_agent"
+    requester_id: "agent_0001"
+    asset_ref: "work_0001"
+    usage_context: "licensed_inference"
+  external_charge_event:
+    charge_time: "2026-04-20T00:00:02Z"
+    currency: "USD"
+    gross_amount: 1.25
+    billing_basis: "per_inference"
+  royalty_settlement:
+    settlement_status: "not_ready"
+    settlement_amount: null
+    settlement_currency: null
+  verification:
+    signature_bundle:
+      algorithm: "ed25519"
+      signed_fields:
+        - "access_snapshot"
+        - "external_charge_event"
+        - "royalty_settlement"
+      signer:
+        signer_type: "license_server"
+        signer_id: "did:example:server01"
+        key_id: "key-1"
+      signature: "base64:placeholder"
+      signed_at: "2026-04-20T00:00:03Z"
+    verification_result:
+      status: "not_checked"
+      checked_at: null
+      verifier_id: null
+      failure_reason: null
+  extensions: []
+
+change_log:
+  version: "0.2"
+  highlights:
+    - "Added strict sync_ids contract."
+    - "Added signature and verification structure."
+    - "Added idempotency and recomputation structure."
+    - "Added formal state machine."
+    - "Added compatibility levels and extension namespaces."
